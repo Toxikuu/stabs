@@ -19,13 +19,13 @@ fn determine_default_selector(url: &str) -> Option<&str> {
     let mut selectors = HashMap::new();
 
     selectors.insert("github.com", "div.Box-row:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > h2:nth-child(1) > a:nth-child(1)");
+    selectors.insert("/releases/latest", ".css-truncate > span:nth-child(2)"); // github latest
+
     selectors.insert("pypi", ".package-header__name");
 
-    // fucking hell gnu refuses to do this shit consistently making scraping it a nightmare
     selectors.insert("savannah", ".list > tbody:nth-child(1) > tr:nth-child(15) > td:nth-child(1) > a:nth-child(1)");
     selectors.insert("/?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)"); // ftp.gnu.org sorted by last modified
-    // unfortunately, some upstreams don't make it easy to parse the latest version, so
-    // arch's repo is included for convenience
+
     selectors.insert("archlinux.org/packages", "#pkgdetails > h2:nth-child(1)");
 
     for (key, selector) in selectors.iter() {
