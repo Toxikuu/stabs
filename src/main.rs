@@ -52,7 +52,7 @@ fn determine_default_selector(url: &str) -> Option<&str> {
 
     selectors.insert(r"(?i).*archlinux\.org\/packages\/.+", "#pkgdetails > h2:nth-child(1)");
 
-    selectors.insert(r"(?i).*sourceforge\.net.+\/files.+", ".sub-label");
+    selectors.insert(r"(?i).*sourceforge\.net.+\/files.*", ".sub-label");
 
     let patterns: Vec<(Regex, &str)> = selectors.iter()
         .filter_map(|(key, selector)| Regex::new(key).ok().map(|regex| (regex, *selector)))
