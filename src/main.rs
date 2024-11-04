@@ -7,6 +7,9 @@ use std::io::{Read, BufRead, BufReader};
 use std::collections::HashMap;
 use std::env;
 use serde::Deserialize;
+use regex::Regex;
+use std::time::Duration;
+use std::thread::sleep;
 
 #[derive(Deserialize)]
 struct Package {
@@ -15,8 +18,26 @@ struct Package {
     selector: Option<String>,
 }
 
+fn extract_version(text: &str, pkg_str: &str) -> Result<String, String> {
+    let version_pattern = Regex::new(r"\d+(\.\d+)*").map_err(|e| e.to_string())?;
+
+    let mut vers = text.replace(pkg_str, "")
+        .replace("_", "-")
+        .to_lowercase();
+
+    if vers.starts_with('v') {
+        vers = vers.replacen('v', "", 1);
+    }
+
+    match version_pattern.find(&vers) {
+        Some(m) => Ok(m.as_str().to_string()),
+        _ => Err("Version not found".to_string()),
+    }
+}
+
 fn determine_default_selector(url: &str) -> Option<&str> {
     let mut selectors = HashMap::new();
+    // TODO: allow regex for urls in the selector tuples
 
     selectors.insert("github.com", "div.Box-row:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > h2:nth-child(1) > a:nth-child(1)");
     selectors.insert("/releases/latest", ".css-truncate > span:nth-child(2)"); // github latest
@@ -25,6 +46,7 @@ fn determine_default_selector(url: &str) -> Option<&str> {
 
     selectors.insert("savannah", ".list > tbody:nth-child(1) > tr:nth-child(15) > td:nth-child(1) > a:nth-child(1)");
     selectors.insert("/?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)"); // ftp.gnu.org sorted by last modified
+                                                                                                                                          // this is pretty fucked tho so i may change it later
 
     selectors.insert("archlinux.org/packages", "#pkgdetails > h2:nth-child(1)");
 
@@ -38,65 +60,57 @@ fn determine_default_selector(url: &str) -> Option<&str> {
 }
 
 fn latest(pkg: &Package) -> Result<String, Box<dyn Error>> {
-
     if pkg.upstream.is_empty() {
-        return Err(format!("Empty upstream for {}", pkg.name).into())
+        return Err(format!("Empty upstream for {}", pkg.name).into());
     }
 
-    let response = get(&pkg.upstream).set("User-Agent", "stabs").call()?.into_string()?;
-    let document = Html::parse_document(&response);
+    let mut attempt = 0;
+    const MAX_ATTEMPTS: usize = 7;
+    const WAIT_TIME: u64 = 1337; // ms
 
-    let selector: Selector;
-    let default_selector = determine_default_selector(&pkg.upstream);
+    while attempt < MAX_ATTEMPTS {
+        attempt += 1;
 
-    if let Some(selector_str) = pkg.selector.as_deref().or(default_selector) {
-        selector = Selector::parse(selector_str).unwrap();
-    } else {
-        return Err("No valid selector found".into());
-    }
+        let response = get(&pkg.upstream)
+            .set("User-Agent", "stabs")
+            .call();
 
+        match response {
+            Ok(res) => {
+                let document = Html::parse_document(&res.into_string()?);
 
-    if let Some(element) = document.select(&selector).next() {
-        if let Some(version) = element.text().next() {
-            let mut vers = version.trim().to_string().to_lowercase();
+                let default_selector = determine_default_selector(&pkg.upstream);
+                let selector_str = match pkg.selector.as_deref() {
+                    Some(s) if !s.is_empty() => s,
+                    _ => default_selector.ok_or("No valid selector found")?,
+                };
 
-            // version string cleanup
-            if vers.contains(&pkg.name) {
-                vers = vers.replace(&pkg.name, "").trim().to_string();
-            }
+                let selector = Selector::parse(selector_str).map_err(|_| "Invalid selector pattern")?;
 
-            if vers.contains('-') {
-                let alt_name = pkg.name.replace('_', "-");
-                if vers.contains(&alt_name) {
-                    vers = vers.replace(&alt_name, "").trim().to_string()
+                if let Some(element) = document.select(&selector).next() {
+                    if let Some(version_text) = element.text().next() {
+                        match extract_version(version_text, &pkg.name) {
+                            Ok(version) => {
+                                return Ok(version);
+                            },
+                            Err(e) => {
+                                eprintln!("Regex failed: {}", e);
+                                println!("Raw version text: {}", version_text);
+                            }
+                        }
+                    }
                 }
+                eprintln!("\x1b[30;3m({}/{}) Retrying '{}'\x1b[0m", attempt, MAX_ATTEMPTS, pkg.name);
             }
-
-            if vers.starts_with('v') {
-                vers = vers.replacen('v', "", 1);
+            Err(err) => {
+                eprintln!("Attempt {}: Failed to fetch content for '{}': {}", attempt, pkg.name, err);
             }
-
-            if vers.starts_with('-') {
-                vers = vers.replacen('-', "", 1);
-            }
-
-            if let Some(first_part) = vers.split(".t").next() {
-                vers = first_part.to_string();
-            }
-
-            if let Some(first_part) = vers.split(".zip").next() {
-                vers = first_part.to_string();
-            }
-
-            if let Some(first_part) = vers.split('-').next() {
-                vers = first_part.to_string();
-            }
-
-            return Ok(vers);
         }
+
+        sleep(Duration::from_millis(WAIT_TIME));
     }
 
-    Err(format!("Failed to find the latest version for {}", pkg.name).into())
+    Err("Generic failure".into())
 }
 
 fn read_versions(file_path: &str) -> HashMap<String, String> {
@@ -147,7 +161,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             }
             Err(e) => {
-                eprintln!("Error: {}", e);
+                if !e.to_string().contains("upstream") {
+                    eprintln!("Error for '{}': {}", pkg.name, e);
+                }
             }
         }
     });
