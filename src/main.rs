@@ -42,6 +42,8 @@ fn determine_default_selector(url: &str) -> Option<&str> {
     selectors.insert("github.com", "div.Box-row:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > h2:nth-child(1) > a:nth-child(1)");
     selectors.insert("/releases/latest", ".css-truncate > span:nth-child(2)"); // github latest
 
+    selectors.insert("/-/tags", "li.gl-justify-between:nth-child(1) > div:nth-child(1) > a:nth-child(2)");
+
     selectors.insert("pypi", ".package-header__name");
 
     selectors.insert("savannah", ".list > tbody:nth-child(1) > tr:nth-child(15) > td:nth-child(1) > a:nth-child(1)");
