@@ -1,6 +1,6 @@
 [package]
 name = "stabs"
-version = "0.7.0" # regex urls
+version = "0.7.2" # sourceforge support
 edition = "2021"
 
 [dependencies]
