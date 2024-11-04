@@ -42,7 +42,7 @@ fn determine_default_selector(url: &str) -> Option<&str> {
     selectors.insert(r"(?i).*github\.com.+\/tags", "div.Box-row:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > h2:nth-child(1) > a:nth-child(1)");
     selectors.insert(r"(?i).*github\.com.+\/releases\/latest", ".css-truncate > span:nth-child(2)");
 
-    selectors.insert(r"(?i).*gitlab\.com.+\/-\/tags", "li.gl-justify-between:nth-child(1) > div:nth-child(1) > a:nth-child(2)");
+    selectors.insert(r"(?i).*gitlab.+\/-\/tags", "li.gl-justify-between:nth-child(1) > div:nth-child(1) > a:nth-child(2)");
 
     selectors.insert(r"(?i).*pypi\.org.+", ".package-header__name");
 
@@ -170,7 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             Err(e) => {
                 if !e.to_string().contains("upstream") {
-                    eprintln!("Error for '{}': {}", pkg.name, e);
+                    eprintln!("\x1b[31;1;3mError for '{}': {}\x1b[0m", pkg.name, e);
                 }
             }
         }
