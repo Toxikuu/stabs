@@ -54,6 +54,8 @@ fn determine_default_selector(url: &str) -> Option<&str> {
 
     selectors.insert(r"(?i).*sourceforge\.net.+\/files.*", ".sub-label");
 
+    selectors.insert(r"(?i).+freedesktop\.org\/.*releases\/.+\/\?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)");
+
     let patterns: Vec<(Regex, &str)> = selectors.iter()
         .filter_map(|(key, selector)| Regex::new(key).ok().map(|regex| (regex, *selector)))
         .collect();

@@ -1,6 +1,6 @@
 [package]
 name = "stabs"
-version = "0.7.4" # error display formatting && gitlab regex tweak
+version = "0.7.5" # freedesktop
 edition = "2021"
 
 [dependencies]
