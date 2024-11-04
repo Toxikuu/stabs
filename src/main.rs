@@ -19,7 +19,7 @@ struct Package {
 }
 
 fn extract_version(text: &str, pkg_str: &str) -> Result<String, String> {
-    let version_pattern = Regex::new(r"\d+(\.\d+)*").map_err(|e| e.to_string())?;
+    let version_pattern = Regex::new(r"\b\d+\.\d+\.\d+\b|\b\d+\.\d+\b|\b\d+\b").map_err(|e| e.to_string())?;
 
     let mut vers = text.replace(pkg_str, "")
         .replace("_", "-")

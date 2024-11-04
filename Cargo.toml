@@ -1,6 +1,6 @@
 [package]
 name = "stabs"
-version = "0.7.5" # freedesktop
+version = "0.7.6" # version regex
 edition = "2021"
 
 [dependencies]
