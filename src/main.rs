@@ -39,21 +39,25 @@ fn determine_default_selector(url: &str) -> Option<&str> {
     let mut selectors = HashMap::new();
     // TODO: allow regex for urls in the selector tuples
 
-    selectors.insert("github.com", "div.Box-row:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > h2:nth-child(1) > a:nth-child(1)");
-    selectors.insert("/releases/latest", ".css-truncate > span:nth-child(2)"); // github latest
+    selectors.insert(r"(?i).*github\.com.+\/tags", "div.Box-row:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > h2:nth-child(1) > a:nth-child(1)");
+    selectors.insert(r"(?i).*github\.com.+\/releases\/latest", ".css-truncate > span:nth-child(2)");
 
-    selectors.insert("/-/tags", "li.gl-justify-between:nth-child(1) > div:nth-child(1) > a:nth-child(2)");
+    selectors.insert(r"(?i).*gitlab\.com.+\/-\/tags", "li.gl-justify-between:nth-child(1) > div:nth-child(1) > a:nth-child(2)");
 
-    selectors.insert("pypi", ".package-header__name");
+    selectors.insert(r"(?i).*pypi\.org.+", ".package-header__name");
 
-    selectors.insert("savannah", ".list > tbody:nth-child(1) > tr:nth-child(15) > td:nth-child(1) > a:nth-child(1)");
-    selectors.insert("/?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)"); // ftp.gnu.org sorted by last modified
-                                                                                                                                          // this is pretty fucked tho so i may change it later
+    selectors.insert(r"(?i).*download.savannah.nongnu.org\/releases.+\/\?C=M&O=D", "tr.e:nth-child(2) > td:nth-child(1) > a:nth-child(1)");
 
-    selectors.insert("archlinux.org/packages", "#pkgdetails > h2:nth-child(1)");
+    selectors.insert(r"(?i).*ftp.gnu.org\/.+\/\?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)");
 
-    for (key, selector) in selectors.iter() {
-        if url.contains(key) {
+    selectors.insert(r"(?i).*archlinux.org\/packages\/.+", "#pkgdetails > h2:nth-child(1)");
+
+    let patterns: Vec<(Regex, &str)> = selectors.iter()
+        .filter_map(|(key, selector)| Regex::new(key).ok().map(|regex| (regex, *selector)))
+        .collect();
+
+    for (pattern, selector) in patterns.iter() {
+        if pattern.is_match(url) {
             return Some(selector);
         }
     }
