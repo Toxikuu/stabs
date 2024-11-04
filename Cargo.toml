@@ -1,6 +1,6 @@
 [package]
 name = "stabs"
-version = "0.6.1" # gitlab tags
+version = "0.7.0" # regex urls
 edition = "2021"
 
 [dependencies]
