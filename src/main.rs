@@ -46,7 +46,7 @@ fn determine_default_selector(url: &str) -> Option<&str> {
 
     selectors.insert(r"(?i).*pypi\.org.+", ".package-header__name");
 
-    selectors.insert(r"(?i).*download.savannah.nongnu.org\/releases.+\/\?C=M&O=D", "tr.e:nth-child(2) > td:nth-child(1) > a:nth-child(1)");
+    selectors.insert(r"(?i).*download\.savannah\..*gnu.org\/releases.+\/\?C=M&O=D", "tr.e:nth-child(2) > td:nth-child(1) > a:nth-child(1)");
 
     selectors.insert(r"(?i).*ftp.gnu.org\/.+\/\?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)");
 
