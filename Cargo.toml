@@ -1,6 +1,6 @@
 [package]
-name = "stabs"
-version = "0.7.6" # version regex
+name = "stab"
+version = "0.8.0" # various fixes and improvements
 edition = "2021"
 
 [dependencies]
