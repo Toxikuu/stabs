@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::env;
 use serde::Deserialize;
 use regex::Regex;
+use std::path::Path;
 use std::time::Duration;
 use std::thread::sleep;
 
@@ -19,12 +20,13 @@ struct Package {
 }
 
 fn extract_version(text: &str, pkg_str: &str) -> Result<String, String> {
-    let version_pattern = Regex::new(r"\b\d+\.\d+\.\d+\b|\b\d+\.\d+\b|\b\d+\b").map_err(|e| e.to_string())?;
+    let version_pattern = Regex::new(r"\d+\.\d+\.\d+\.\d+|\d+\.\d+\.\d+|\d+\.\d+|\d+").map_err(|e| e.to_string())?;
 
     let mut vers = text.replace(pkg_str, "")
         .replace("_", "-")
         .to_lowercase();
 
+    // this is likely unnecessary
     if vers.starts_with('v') {
         vers = vers.replacen('v', "", 1);
     }
@@ -37,8 +39,6 @@ fn extract_version(text: &str, pkg_str: &str) -> Result<String, String> {
 
 fn determine_default_selector(url: &str) -> Option<&str> {
     let mut selectors = HashMap::new();
-    // TODO: allow regex for urls in the selector tuples
-
     selectors.insert(r"(?i).*github\.com.+\/tags", "div.Box-row:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > h2:nth-child(1) > a:nth-child(1)");
     selectors.insert(r"(?i).*github\.com.+\/releases\/latest", ".css-truncate > span:nth-child(2)");
 
@@ -51,10 +51,11 @@ fn determine_default_selector(url: &str) -> Option<&str> {
     selectors.insert(r"(?i).*ftp\.gnu\.org\/.+\/\?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)");
 
     selectors.insert(r"(?i).*archlinux\.org\/packages\/.+", "#pkgdetails > h2:nth-child(1)");
+    selectors.insert(r"(?i).*repology\.org\/project.*\/information.*", ".version-newest");
 
     selectors.insert(r"(?i).*sourceforge\.net.+\/files.*", ".sub-label");
 
-    selectors.insert(r"(?i).+freedesktop\.org\/.*releases\/.+\/\?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)");
+    selectors.insert(r"(?i).*freedesktop\.org\/.*releases\/.+\/\?C=M;O=D", "body > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(4) > td:nth-child(2) > a:nth-child(1)");
 
     let patterns: Vec<(Regex, &str)> = selectors.iter()
         .filter_map(|(key, selector)| Regex::new(key).ok().map(|regex| (regex, *selector)))
@@ -86,8 +87,8 @@ fn latest(pkg: &Package) -> Result<String, Box<dyn Error>> {
             .call();
 
         match response {
-            Ok(res) => {
-                let document = Html::parse_document(&res.into_string()?);
+            Ok(r) => {
+                let document = Html::parse_document(&r.into_string()?);
 
                 let default_selector = determine_default_selector(&pkg.upstream);
                 let selector_str = match pkg.selector.as_deref() {
@@ -112,8 +113,8 @@ fn latest(pkg: &Package) -> Result<String, Box<dyn Error>> {
                 }
                 eprintln!("\x1b[30;3m({}/{}) Retrying '{}'\x1b[0m", attempt, MAX_ATTEMPTS, pkg.name);
             }
-            Err(err) => {
-                eprintln!("Attempt {}: Failed to fetch content for '{}': {}", attempt, pkg.name, err);
+            Err(e) => {
+                eprintln!("\x1b[30;3m({}/{}) HTTP error for '{}': {}\x1b[0m", attempt, MAX_ATTEMPTS, pkg.name, e);
             }
         }
 
@@ -123,7 +124,7 @@ fn latest(pkg: &Package) -> Result<String, Box<dyn Error>> {
     Err("Generic failure".into())
 }
 
-fn read_versions(file_path: &str) -> HashMap<String, String> {
+fn read_versions(file_path: &Path) -> HashMap<String, String> {
     let mut versions = HashMap::new();
     if let Ok(file) = File::open(file_path) {
         let reader = BufReader::new(file);
@@ -142,7 +143,7 @@ fn read_versions(file_path: &str) -> HashMap<String, String> {
     versions
 }
 
-fn read_json(file_path: &str) -> Result<Vec<Package>, Box<dyn Error>> {
+fn read_json(file_path: &Path) -> Result<Vec<Package>, Box<dyn Error>> {
     let mut file = File::open(file_path)?;
     let mut json_string = String::new();
     file.read_to_string(&mut json_string)?;
@@ -152,9 +153,14 @@ fn read_json(file_path: &str) -> Result<Vec<Package>, Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let json_path = env::var("STABS_JSON").unwrap_or_else(|_| "/etc/rid/pkgs.json".to_string());
-    let packages = read_json(&json_path)?;
-    let env_versions = read_versions("/etc/rid/versions");
+    let json_path_str = env::var("RIDPKGSJSON").unwrap_or_else(|_| "/etc/rid/pkgs.json".to_string());
+    let vers_path_str = env::var("RIDPKGSVERS").unwrap_or_else(|_| "/etc/rid/versions".to_string());
+
+    let json_path = Path::new(&json_path_str);
+    let vers_path = Path::new(&vers_path_str);
+
+    let packages = read_json(json_path)?;
+    let env_versions = read_versions(vers_path);
 
     packages.par_iter().for_each(|pkg| {
         match latest(pkg) {
@@ -168,7 +174,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                         println!("{}: {} <-> {}", pkg.name, env_version, version);
                     }
                 }
-
             }
             Err(e) => {
                 if !e.to_string().contains("upstream") {
