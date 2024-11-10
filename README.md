@@ -1,5 +1,5 @@
-# stabs
+# stab
 
-Stabs is a version-checking utility for rid. Stabs relies on rid's pkgs.json. For now that json must exist at /etc/rid/pkgs.json.
+Stab is a version-checking utility for rid. Stab relies on rid's pkgs.json. $RIDPKGSJSON=/path/to/pkgs.json.
 
-Stabs also requires the latest version of rid.
+The latest version of rid is most likely to be compatible with stab.
