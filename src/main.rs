@@ -3,7 +3,7 @@ use ureq::get;
 use scraper::{Html, Selector};
 use std::error::Error;
 use std::fs::File;
-use std::io::{Read, BufRead, BufReader};
+use std::io::Read;
 use std::collections::HashMap;
 use std::env;
 use serde::Deserialize;
@@ -15,21 +15,30 @@ use std::thread::sleep;
 #[derive(Deserialize)]
 struct Package {
     name: String,
+    version: String,
     upstream: String,
     selector: Option<String>,
 }
 
 fn extract_version(text: &str, pkg_str: &str) -> Result<String, String> {
-    let version_pattern = Regex::new(r"\d+\.\d+\.\d+\.\d+|\d+\.\d+\.\d+|\d+\.\d+|\d+").map_err(|e| e.to_string())?;
+    let version_pattern = Regex::new(
+    r"\d+\.\d+\.\d+\.\d+(-rc\d+|-*a\d+|-*b\d+)?|\d+\.\d+\.\d+(-rc\d+|-*a\d+|-*b\d+)?|\d+\.\d+(-rc\d+|-*a\d+|-*b\d+)?|\d+(-rc\d+|-*a\d+|-*b*\d*)?"
+    )
+    .map_err(|e| e.to_string())?;
 
-    let mut vers = text.replace(pkg_str, "")
-        .replace("_", "-")
-        .to_lowercase();
+    let mut vers = text.to_lowercase();
 
-    // this is likely unnecessary
-    if vers.starts_with('v') {
-        vers = vers.replacen('v', "", 1);
+    let pkg_str = pkg_str.replace("_", "-");
+
+    if vers.contains(&pkg_str) {
+        vers = vers.replace(&pkg_str, "")
     }
+
+    if vers.contains(".t") {
+        vers = vers.split(".t").next().unwrap().to_string();
+    }
+
+    // dbg!(text, &vers);
 
     match version_pattern.find(&vers) {
         Some(m) => Ok(m.as_str().to_string()),
@@ -124,25 +133,6 @@ fn latest(pkg: &Package) -> Result<String, Box<dyn Error>> {
     Err("Generic failure".into())
 }
 
-fn read_versions(file_path: &Path) -> HashMap<String, String> {
-    let mut versions = HashMap::new();
-    if let Ok(file) = File::open(file_path) {
-        let reader = BufReader::new(file);
-
-        for line in reader.lines().map_while(Result::ok) {
-            if let Some(stripped) = line.strip_prefix("export") {
-                let parts: Vec<&str> = stripped.split("_version=").collect();
-                if parts.len() == 2 {
-                    let name = parts[0].trim().to_string();
-                    let version = parts[1].trim().trim_matches('"').to_string();
-                    versions.insert(name, version);
-                }
-            }
-        }
-    }
-    versions
-}
-
 fn read_json(file_path: &Path) -> Result<Vec<Package>, Box<dyn Error>> {
     let mut file = File::open(file_path)?;
     let mut json_string = String::new();
@@ -154,25 +144,17 @@ fn read_json(file_path: &Path) -> Result<Vec<Package>, Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let json_path_str = env::var("RIDPKGSJSON").unwrap_or_else(|_| "/etc/rid/pkgs.json".to_string());
-    let vers_path_str = env::var("RIDPKGSVERS").unwrap_or_else(|_| "/etc/rid/versions".to_string());
-
     let json_path = Path::new(&json_path_str);
-    let vers_path = Path::new(&vers_path_str);
-
     let packages = read_json(json_path)?;
-    let env_versions = read_versions(vers_path);
 
     packages.par_iter().for_each(|pkg| {
         match latest(pkg) {
             Ok(version) => {
-
-                if let Some(env_version) = env_versions.get(&pkg.name) {
-                    if version != *env_version {
-                        let displayed_version = format!("\x1b[31;1m{}\x1b[0m", version);
-                        println!("{}: {} <-> {}", pkg.name, env_version, displayed_version);
-                    } else {
-                        println!("{}: {} <-> {}", pkg.name, env_version, version);
-                    }
+                if version != *pkg.version {
+                    let displayed_version = format!("\x1b[31;1m{}\x1b[0m", version);
+                    println!("{}: {} <-> {}", pkg.name, pkg.version, displayed_version);
+                } else {
+                    println!("{}: {} <-> {}", pkg.name, pkg.version, version);
                 }
             }
             Err(e) => {
