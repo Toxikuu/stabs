@@ -1,6 +1,6 @@
 [package]
 name = "stab"
-version = "0.8.0" # various fixes and improvements
+version = "0.9.0" # changes to the regex to allow for unusual versions
 edition = "2021"
 
 [dependencies]
